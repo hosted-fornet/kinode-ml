@@ -274,6 +274,7 @@ def serialize_message(id, message_type, library, data_tensor):
     }
     return msgpack.packb(message, use_bin_type=True)
 
+
 def serialize_tensor_data_tf(tensors):
     dtype = REVERSE_KINODE_ML_DATA_TYPE_TO_TENSORFLOW_MAP[tensors[0].dtype]
     # Ensure all tensors are on CPU memory
@@ -297,17 +298,18 @@ def serialize_tensor_data_tf(tensors):
 
     return shape, dtype, bytes_data
 
+
 def deserialize_tensor_data_tf(bytes_list, shape, dtype):
     # Determine the numpy and TensorFlow data types from the mappings
     np_dtype = KINODE_ML_DATA_TYPE_TO_NUMPY_MAP[dtype]
     tf_dtype = KINODE_ML_DATA_TYPE_TO_TENSORFLOW_MAP[dtype]
 
     # Calculate the size of a single tensor's data in bytes
-    single_tensor_byte_size = np.product(shape) * np.dtype(np_dtype).itemsize
+    single_tensor_byte_size = np.prod(shape) * np.dtype(np_dtype).itemsize
 
     # Ensure the byte_list is divisible by the size of a single tensor
     if len(bytes_list) % single_tensor_byte_size != 0:
-        raise ValueError("byte_list size is not a multiple of shape product and dtype size")
+        raise ValueError(f"byte_list size ({len(bytes_list)}) is not a multiple of shape product and dtype size ({single_tensor_byte_size})")
 
     # Calculate how many tensors are represented by the byte_list
     num_tensors = len(bytes_list) // single_tensor_byte_size
@@ -316,14 +318,15 @@ def deserialize_tensor_data_tf(bytes_list, shape, dtype):
     full_array = np.frombuffer(bytes(bytes_list), dtype=np_dtype)
 
     # Split the array into multiple arrays, each representing a tensor, and convert each to a TensorFlow tensor
-    tensors = [tf.convert_to_tensor(full_array[i * np.product(shape):(i + 1) * np.product(shape)].reshape(shape), dtype=tf_dtype)
+    tensors = [tf.convert_to_tensor(full_array[i * np.prod(shape):(i + 1) * np.prod(shape)].reshape(shape), dtype=tf_dtype)
                for i in range(num_tensors)]
 
     return tensors
 
+
 async def run(port, process="ml:ml:sys"):
     uri = f"ws://localhost:{port}/{process}"
-    async with websockets.connect(uri, ping_interval=None) as websocket:
+    async with websockets.connect(uri, ping_interval=None, max_size = 10 * 1024 * 1024 * 1024) as websocket:
         while True:
             message = await websocket.recv()
             message = deserialize_message(message)
@@ -356,11 +359,6 @@ async def run(port, process="ml:ml:sys"):
                     request['data_shape'],
                     request['data_type'],
                 )
-                #data = bytes_to_tensors_tf(
-                #    request["data_bytes"],
-                #    request["data_shape"],
-                #    dtype=dtype,
-                #)
                 # evaluate model
                 outputs = evaluate_model_tf(model, request["data_bytes"])
                 # serialize response

@@ -101,7 +101,8 @@ fn handle_message(
                 message_type: http::WsMessageType::Binary,
                 desired_reply_type: MessageType::Response,
             })?)
-            .expects_response(15)
+            .expects_response(60)
+            //.expects_response(15)
             .inherit(true)
             .send()?;
     }
